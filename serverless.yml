@@ -1,0 +1,120 @@
+service: qr-generator-api
+
+frameworkVersion: '4'
+
+provider:
+  name: aws
+  runtime: python3.9
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  memorySize: 512
+  timeout: 30
+  
+  # Variables de entorno
+  environment:
+    BUCKET_NAME: ${self:custom.bucketName}
+    REGION: ${self:provider.region}
+    STAGE: ${self:provider.stage}
+  
+  # Permisos IAM mínimos
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - logs:CreateLogGroup
+        - logs:CreateLogStream
+        - logs:PutLogEvents
+      Resource: "arn:aws:logs:*:*:*"
+    
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+        - s3:PutObjectAcl
+        - s3:GetObject
+      Resource: "arn:aws:s3:::${self:custom.bucketName}/*"
+
+# Variables personalizadas
+custom:
+  bucketName: ${self:service}-qr-images-${self:provider.stage}
+  
+  # Plugin para optimizar Python
+  pythonRequirements:
+    dockerizePip: true
+    slim: true
+    noDeps:
+      - boto3
+      - botocore
+  
+  # Configuración CORS
+  cors:
+    origin: '*'
+    headers:
+      - Content-Type
+      - X-Amz-Date
+      - Authorization
+      - X-Api-Key
+      - X-Amz-Security-Token
+    allowCredentials: false
+
+# Plugins
+plugins:
+  - serverless-python-requirements
+
+# Funciones Lambda esenciales
+functions:
+  generateQR:
+    handler: handler.generate_qr
+    name: ${self:service}-generate-qr-${self:provider.stage}
+    description: "Genera códigos QR y los almacena en S3"
+    events:
+      - http:
+          path: qr/generate
+          method: post
+          cors: ${self:custom.cors}
+  
+  getQRInfo:
+    handler: handler.get_qr_info
+    name: ${self:service}-get-qr-info-${self:provider.stage}
+    description: "Obtiene información de un QR existente"
+    events:
+      - http:
+          path: qr/{filename}
+          method: get
+          cors: ${self:custom.cors}
+
+  listQRs:
+    handler: handler.list_qrs
+    name: ${self:service}-list-qrs-${self:provider.stage}
+    description: "Lista QRs generados"
+    events:
+      - http:
+          path: qr
+          method: get
+          cors: ${self:custom.cors}
+
+# Recursos de infraestructura mínimos
+resources:
+  Resources:
+    # S3 Bucket para almacenar QRs
+    QRImagesBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.bucketName}
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders: ["*"]
+              AllowedMethods: [GET, HEAD]
+              AllowedOrigins: ["*"]
+              MaxAge: 3000
+
+    # Política del bucket para lectura pública
+    QRImagesBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref QRImagesBucket
+        PolicyDocument:
+          Statement:
+            - Sid: PublicReadGetObject
+              Effect: Allow
+              Principal: "*"
+              Action: s3:GetObject
+              Resource: !Sub "${QRImagesBucket}/*"
