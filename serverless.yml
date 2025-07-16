@@ -1,6 +1,9 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: senquevila
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+app: qr-generator
 service: qr-generator-api
 
-frameworkVersion: '4'
 
 provider:
   name: aws
@@ -34,6 +37,13 @@ provider:
 
 # Variables personalizadas
 custom:
+  dotenv:
+    path: ./.env
+    exclude:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_DEFAULT_REGION
+  useDotenv: true
   bucketName: ${self:service}-qr-images-${self:provider.stage}
   
   # Plugin para optimizar Python
@@ -58,6 +68,7 @@ custom:
 # Plugins
 plugins:
   - serverless-python-requirements
+  - serverless-dotenv-plugin
 
 # Funciones Lambda esenciales
 functions:

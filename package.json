@@ -4,6 +4,7 @@
   "description": "Serverless QR generator API",
   "private": true,
   "devDependencies": {
-    "serverless-python-requirements": "^6.1.0"
+    "serverless-python-requirements": "^6.1.0",
+    "serverless-dotenv-plugin": "^4.0.2"
   }
 }
